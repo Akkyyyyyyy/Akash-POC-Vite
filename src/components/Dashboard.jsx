@@ -1,65 +1,118 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, Legend, ResponsiveContainer, CartesianGrid
+  BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, Legend, ResponsiveContainer, CartesianGrid,
+  LineChart,
+  Line
 } from 'recharts';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from './ui/dropdown-menu';
+import { Button } from './ui/button';
 
-const API_BASE = 'http://localhost:5000/user/dashboard';
+// const API_BASE = 'http://localhost:5000/user/dashboard';
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
+console.log(API_BASE);
+
+const GRANULARITIES = [
+  { label: 'Daily', value: 'day' },
+  { label: 'Weekly', value: 'week' },
+  { label: 'Monthly', value: 'month' },
+  { label: 'Yearly', value: 'year' },
+];
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [weeklyData, setWeeklyData] = useState([]);
   const [todayLabel, setTodayLabel] = useState('');
-  const [period, setPeriod] = useState('week');
-  const [periodCount, setPeriodCount] = useState(0);
   const [genderData, setGenderData] = useState([]);
+  const [monthsData, setMonthsData] = useState([]);
   const [loading, setLoading] = useState({
     weekly: true,
-    period: true,
+    monthly: true,
     gender: true
   });
+  // Add state for each chart's granularity
+  const [weeklyGranularity, setWeeklyGranularity] = useState('week');
+  const [totalGranularity, setTotalGranularity] = useState('month');
+  const [genderGranularity, setGenderGranularity] = useState('month');
+
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) navigate('/login');
   }, [navigate]);
 
+  // Refactor data fetching for weekly registrations
   useEffect(() => {
-    setLoading(prev => ({...prev, weekly: true}));
-    fetch(`${API_BASE}/week`)
+    setLoading(prev => ({ ...prev, weekly: true }));
+    let url = '';
+    if (weeklyGranularity === 'day') url = `${API_BASE}user/dashboard/period?period=day`;
+    else if (weeklyGranularity === 'week') url = `${API_BASE}user/dashboard/period?period=week`;
+    else if (weeklyGranularity === 'month') url = `${API_BASE}user/dashboard/period?period=month`;
+    else if (weeklyGranularity === 'year') url = `${API_BASE}user/dashboard/period?period=year`;
+    
+    fetch(url)
       .then(res => res.json())
       .then(data => {
-        const today = new Date().toLocaleDateString('en-US', { weekday: 'short' });
-        setTodayLabel(today);
-        // Ensure data exists and has proper structure
-        const formattedData = Array.isArray(data) ? data.map(item => ({
-          date: item.date || '',
-          count: item.count || 0
-        })) : [];
-        setWeeklyData(formattedData);
+        if (data.data && Array.isArray(data.data)) {
+          // Use the new backend response format
+          const formattedData = data.data.map(item => ({
+            date: item.label,
+            count: item.count
+          }));
+          setWeeklyData(formattedData);
+          
+          // Set today label for highlighting (only for weekly view)
+          if (weeklyGranularity === 'week') {
+            const today = new Date().toLocaleDateString('en-US', { weekday: 'short' });
+            setTodayLabel(today);
+          }
+        } else {
+          setWeeklyData([]);
+        }
       })
       .catch(error => {
-        console.error('Error fetching weekly data:', error);
+        console.error('Error fetching data:', error);
         setWeeklyData([]);
       })
-      .finally(() => setLoading(prev => ({...prev, weekly: false})));
-  }, []);
+      .finally(() => {
+        setLoading(prev => ({ ...prev, weekly: false }));
+      });
+  }, [weeklyGranularity]);
 
+  // Refactor data fetching for total registrations
   useEffect(() => {
-    setLoading(prev => ({...prev, period: true}));
-    fetch(`${API_BASE}/period?period=${period}`)
+    setLoading(prev => ({ ...prev, monthly: true }));
+    let url = '';
+    if (totalGranularity === 'day') url = `${API_BASE}user/dashboard/period?period=day`;
+    else if (totalGranularity === 'week') url = `${API_BASE}user/dashboard/period?period=week`;
+    else if (totalGranularity === 'month') url = `${API_BASE}user/dashboard/period?period=month`;
+    else if (totalGranularity === 'year') url = `${API_BASE}user/dashboard/period?period=year`;
+    
+    fetch(url)
       .then(res => res.json())
-      .then(data => setPeriodCount(data.count || 0))
-      .catch(error => {
-        console.error('Error fetching period data:', error);
-        setPeriodCount(0);
+      .then(data => {
+        if (data.data && Array.isArray(data.data)) {
+          // Use the new backend response format
+          const formattedData = data.data.map(item => ({
+            month: item.label,
+            count: item.count
+          }));
+          setMonthsData(formattedData);
+        } else {
+          setMonthsData([]);
+        }
       })
-      .finally(() => setLoading(prev => ({...prev, period: false})));
-  }, [period]);
+      .catch(error => {
+        console.error('Error fetching data:', error);
+        setMonthsData([]);
+      })
+      .finally(() => setLoading(prev => ({ ...prev, monthly: false })));
+  }, [totalGranularity]);
 
+  // Refactor data fetching for gender distribution
   useEffect(() => {
-    setLoading(prev => ({...prev, gender: true}));
-    fetch(`${API_BASE}/gender`)
+    setLoading(prev => ({ ...prev, gender: true }));
+    fetch(`${API_BASE}user/dashboard/gender`)
       .then(res => res.json())
       .then(data => {
         setGenderData([
@@ -72,30 +125,33 @@ const Dashboard = () => {
         console.error('Error fetching gender data:', error);
         setGenderData([]);
       })
-      .finally(() => setLoading(prev => ({...prev, gender: false})));
-  }, []);
+      .finally(() => setLoading(prev => ({ ...prev, gender: false })));
+  }, [genderGranularity]);
 
   const COLORS = ['#3b82f6', '#ec4899', '#10b981'];
   const barColors = ['#3b82f6', '#3b82f6', '#3b82f6', '#3b82f6', '#3b82f6', '#3b82f6', '#10b981'];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-6">
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800">Dashboard Overview</h1>
-          <div className="text-sm text-gray-500">
-            Last updated: {new Date().toLocaleString()}
-          </div>
         </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Weekly Bar Chart with Today Highlighted */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 col-span-2">
+        <div className="grid grid-cols-2 gap-8">
+          {/* Weekly Registrations Card */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 col-span-2 relative">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-gray-700">Weekly Registrations</h2>
-              <div className="text-xs px-2 py-1 bg-blue-50 text-blue-600 rounded-full">
-                Last 7 days
-              </div>
+              <h2 className="text-lg font-semibold text-gray-700">Registrations</h2>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="min-w-[120px]">{GRANULARITIES.find(g => g.value === weeklyGranularity).label}</Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {GRANULARITIES.map(g => (
+                    <DropdownMenuItem key={g.value} onSelect={() => setWeeklyGranularity(g.value)}>{g.label}</DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             {loading.weekly ? (
               <div className="h-64 flex items-center justify-center">
@@ -109,19 +165,19 @@ const Dashboard = () => {
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={weeklyData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                  <XAxis 
-                    dataKey="date" 
-                    axisLine={false} 
-                    tickLine={false} 
+                  <XAxis
+                    dataKey="date"
+                    axisLine={false}
+                    tickLine={false}
                     tick={{ fill: '#6b7280', fontSize: 12 }}
                   />
-                  <YAxis 
-                    allowDecimals={false} 
-                    axisLine={false} 
-                    tickLine={false} 
+                  <YAxis
+                    allowDecimals={false}
+                    axisLine={false}
+                    tickLine={false}
                     tick={{ fill: '#6b7280', fontSize: 12 }}
                   />
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{
                       backgroundColor: '#ffffff',
                       border: '1px solid #e5e7eb',
@@ -144,50 +200,72 @@ const Dashboard = () => {
               </ResponsiveContainer>
             )}
           </div>
-
-          {/* Total Registration Period Box */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          {/* Total Registrations Card */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold text-gray-700">Total Registrations</h2>
-              <select
-                value={period}
-                onChange={e => setPeriod(e.target.value)}
-                className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 bg-gray-50 focus:ring-2 focus:ring-blue-100 outline-none"
-              >
-                <option value="week">Last Week</option>
-                <option value="month">Last Month</option>
-                <option value="year">Last Year</option>
-                <option value="">All Time</option>
-              </select>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="min-w-[120px]">{GRANULARITIES.find(g => g.value === totalGranularity).label}</Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {GRANULARITIES.map(g => (
+                    <DropdownMenuItem key={g.value} onSelect={() => setTotalGranularity(g.value)}>{g.label}</DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-            {loading.period ? (
+            {loading.monthly ? (
               <div className="h-48 flex items-center justify-center">
                 <div className="animate-pulse text-gray-400">Loading...</div>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center h-48">
-                <div className="text-5xl font-bold text-gray-800 mb-2">
-                  {periodCount.toLocaleString()}
-                </div>
-                <div className="text-sm text-gray-500">
-                  {period === 'week' && 'in the last 7 days'}
-                  {period === 'month' && 'in the last 30 days'}
-                  {period === 'year' && 'in the last year'}
-                  {period === '' && 'total registrations'}
-                </div>
-                <div className="mt-4 w-full bg-gray-100 rounded-full h-2">
-                  <div 
-                    className="bg-blue-500 h-2 rounded-full" 
-                    style={{ width: `${Math.min(100, periodCount / 1000 * 100)}%` }}
-                  ></div>
-                </div>
-              </div>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={monthsData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fill: '#6b7280', fontSize: 11 }}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fill: '#6b7280', fontSize: 12 }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '0.5rem',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="count"
+                    stroke="#3b82f6"
+                    strokeWidth={3}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             )}
           </div>
-
-          {/* Gender Distribution */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-gray-700 mb-4">Gender Distribution</h2>
+          {/* Gender Distribution Card */}
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-gray-700">Gender Distribution</h2>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="min-w-[120px]">{GRANULARITIES.find(g => g.value === genderGranularity).label}</Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {GRANULARITIES.map(g => (
+                    <DropdownMenuItem key={g.value} onSelect={() => setGenderGranularity(g.value)}>{g.label}</DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
             {loading.gender ? (
               <div className="h-64 flex items-center justify-center">
                 <div className="animate-pulse text-gray-400">Loading chart data...</div>
@@ -215,7 +293,7 @@ const Dashboard = () => {
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip 
+                  <Tooltip
                     formatter={(value) => [value, 'Users']}
                     contentStyle={{
                       backgroundColor: '#ffffff',
@@ -224,9 +302,9 @@ const Dashboard = () => {
                       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                     }}
                   />
-                  <Legend 
-                    layout="horizontal" 
-                    verticalAlign="bottom" 
+                  <Legend
+                    layout="horizontal"
+                    verticalAlign="bottom"
                     height={36}
                     wrapperStyle={{ fontSize: '12px' }}
                   />

@@ -6,7 +6,10 @@ import { ChevronDownIcon, Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react
 import { Calendar } from './ui/calendar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu'
 import { countryCodes } from './cc'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
+
 
 const Signup = () => {
     const navigate = useNavigate();
@@ -18,7 +21,6 @@ const Signup = () => {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
-    // Error states
     const [usernameError, setUsernameError] = useState(false);
     const [emailError, setEmailError] = useState(false);
     const [phoneError, setPhoneError] = useState(false);
@@ -27,7 +29,7 @@ const Signup = () => {
     const [passwordError, setPasswordError] = useState(false);
     const [confirmPasswordError, setConfirmPasswordError] = useState(false);
 
-    // Error messages
+
     const [usernameErrorMsg, setUsernameErrorMsg] = useState('');
     const [emailErrorMsg, setEmailErrorMsg] = useState('');
     const [phoneErrorMsg, setPhoneErrorMsg] = useState('');
@@ -35,6 +37,12 @@ const Signup = () => {
     const [genderErrorMsg, setGenderErrorMsg] = useState('');
     const [passwordErrorMsg, setPasswordErrorMsg] = useState('');
     const [confirmPasswordErrorMsg, setConfirmPasswordErrorMsg] = useState('');
+    const user = localStorage.getItem('user');
+
+    useEffect(() => {
+        if (user) navigate('/dashboard')
+    }, [user, navigate])
+
 
     // Password strength states
     const [passwordStrength, setPasswordStrength] = useState({
@@ -180,7 +188,7 @@ const Signup = () => {
         // Submit to backend
         setIsLoading(true);
         try {
-            const response = await fetch(`http://localhost:5000/user/register`, {
+            const response = await fetch(`${API_BASE}user/register`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -201,7 +209,7 @@ const Signup = () => {
             if (!response.ok) {
                 const errorText = data?.error || data?.message || 'Registration failed. Please try again.';
                 // console.log(errorText);
-                
+
 
                 if (errorText.toLowerCase().includes('username')) {
                     setUsernameError(true);
@@ -316,7 +324,7 @@ const Signup = () => {
                                 <DropdownMenuTrigger asChild>
                                     <Button
                                         variant="ghost"
-                                        className={`w-16 h-full p-2 text-center border-b-2 border-gray-400 outline-none bg-white text-gray-500 rounded-xs text-left flex justify-between items-center text-xs ${phoneError ? 'border-red-400' : ''}`}
+                                        className={`w-16 h-full p-2 text-center border-b-2 border-gray-400 outline-none bg-white text-gray-500 rounded-xs flex justify-between items-center text-xs ${phoneError ? 'border-red-400' : ''}`}
                                     >
                                         {countryCode}
                                         <ChevronDownIcon className="h-3 w-3" />
@@ -435,7 +443,7 @@ const Signup = () => {
                         </div>
                     )}
 
-                    {/* Row 4: Password only */}
+
                     <div className='relative flex flex-col w-full'>
                         <div className="relative">
                             <input
@@ -443,6 +451,7 @@ const Signup = () => {
                                 className={`w-full not-last:not-only:p-2 pl-3 pr-12 outline-none border-b-2 border-gray-400 rounded-xs ${passwordError ? 'border-red-400' : ''}`}
                                 placeholder='Enter your Password'
                                 value={form.password}
+                                maxLength={16}
                                 onChange={(e) => {
                                     setForm({ ...form, password: e.target.value })
                                     checkPasswordStrength(e.target.value);
@@ -454,14 +463,14 @@ const Signup = () => {
                             />
                             <button
                                 type="button"
-                                className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                                className="absolute right-2 top-1/2 transform -translate-y-1/2 cursor-pointer"
                                 onClick={() => setShowPassword(!showPassword)}
                             >
                                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                             </button>
                         </div>
 
-                        {/* Password strength indicator */}
+
                         {form.password && (
                             <div className="mt-2 space-y-1 flex gap-2">
                                 <div className="flex items-center space-x-1 text-xs">
@@ -488,11 +497,11 @@ const Signup = () => {
                         )}
                     </div>
 
-                    {/* Row 5: Confirm Password only */}
                     <div className='relative flex flex-col w-full'>
                         <div className="relative">
                             <input
                                 type={showConfirmPassword ? 'text' : 'password'}
+                                maxLength={16}
                                 className={`w-full p-2 pl-3 pr-12 outline-none border-b-2 border-gray-400 rounded-xs ${confirmPasswordError ? 'border-red-400' : ''}`}
                                 placeholder='Confirm Password'
                                 value={form.confirmPassword}
@@ -506,7 +515,7 @@ const Signup = () => {
                             />
                             <button
                                 type="button"
-                                className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                                className="absolute right-2 top-1/2 transform -translate-y-1/2 cursor-pointer"
                                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                             >
                                 {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -533,28 +542,33 @@ const Signup = () => {
                 </div>
 
             </div >
-            {/* OTP Dialog */}
-            <Dialog open={showOtpDialog}>
+
+            <Dialog open={showOtpDialog} onOpenChange={setShowOtpDialog}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Enter OTP</DialogTitle>
                     </DialogHeader>
-                    <div className="flex flex-col gap-2">
+                    <DialogDescription className="flex flex-col gap-2">
                         <input
                             type="text"
                             maxLength={6}
-                            className="p-2 border-b-2 border-gray-400 outline-none text-center text-lg tracking-widest"
+                            className={`p-2 pl-3 pr-8 outline-none border-b-2 rounded-xs text-left tracking-widest text-lg ${otpError ? 'border-red-400' : 'border-gray-400'
+                                }`}
                             placeholder="Enter 6-digit OTP"
                             value={otp}
                             onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
                         />
                         {otpError && <p className="text-red-500 text-xs mt-1">{otpError}</p>}
-                    </div>
+                    </DialogDescription>
                     <DialogFooter>
-                        <Button onClick={handleVerifyOtp} className="w-full">Verify OTP</Button>
+                        <Button onClick={handleVerifyOtp} className="w-full rounded-none bg-[#003153] hover:bg-[#003153]">
+                            Verify OTP
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+
         </div >
     )
 }
