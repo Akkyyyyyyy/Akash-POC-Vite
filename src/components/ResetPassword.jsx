@@ -55,7 +55,7 @@ const ResetPassword = () => {
       const res = await fetch(`${API_BASE}user/reset-password/${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newPassword: password.trim() }),
+        body: JSON.stringify({ password: password.trim() }),
       });
 
       const data = await res.json();

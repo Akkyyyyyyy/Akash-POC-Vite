@@ -7,6 +7,7 @@ import { Calendar } from './ui/calendar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu'
 import { countryCodes } from './cc'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { toast } from 'sonner';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
@@ -40,8 +41,21 @@ const Signup = () => {
     const user = localStorage.getItem('user');
 
     useEffect(() => {
-        if (user) navigate('/dashboard')
-    }, [user, navigate])
+        if (user) navigate('/dashboard');
+        fetchOtpSettings();
+    }, [user, navigate]);
+
+    const fetchOtpSettings = async () => {
+        try {
+            const response = await fetch(`${API_BASE}api/public/settings`);
+            const data = await response.json();
+            if (data.success) {
+                setOtpSettings(data.settings);
+            }
+        } catch (error) {
+            console.error('Error fetching OTP settings:', error);
+        }
+    };
 
 
     // Password strength states
@@ -66,6 +80,10 @@ const Signup = () => {
     const [otp, setOtp] = useState('');
     const [otpError, setOtpError] = useState('');
     const [pendingUserId, setPendingUserId] = useState(null);
+    const [otpSettings, setOtpSettings] = useState({
+        otpEnabled: true,
+        otpEnabledForRegistration: true
+    });
 
     // Validation functions
     const validateEmail = (email) => {
@@ -235,9 +253,16 @@ const Signup = () => {
                 return
             }
 
-            // OTP flow
-            setPendingUserId(data.userId);
-            setShowOtpDialog(true);
+            // Check if OTP is required based on backend response
+            if (data.success && data.message && data.message.includes('OTP sent')) {
+                // OTP flow
+                setPendingUserId(data.userId);
+                setShowOtpDialog(true);
+            } else if (data.success) {
+                // Registration successful without OTP
+                toast.success('Registration successful! You can now login.');
+                navigate('/login');
+            }
         } catch (error) {
             console.error('Registration error:', error);
             alert('Network error. Please check your connection and try again.');
@@ -263,7 +288,7 @@ const Signup = () => {
                 setOtpError(data.error || 'Invalid OTP.');
                 return;
             }
-            alert('Account created successfully!');
+            toast.success('Account created successfully!');
             setShowOtpDialog(false);
             navigate('/login');
         } catch (err) {
@@ -273,18 +298,33 @@ const Signup = () => {
 
     return (
         <div className='flex justify-center items-center h-screen bg-[#003153] p-2'>
-            <div className='bg-white p-6 flex flex-col justify-center items-center w-full max-w-xl shadow-xl/30 gap-3'>
-                <h1 className='text-3xl font-semibold mb-3'>SIGN UP</h1>
+            <div className='bg-white p-6 flex flex-col justify-center items-center w-sm max-w-xl shadow-xl/30'>
+                <h1 className='text-3xl font-semibold mb-2'>SIGN UP</h1>
                 <span className='w-1/2 border-1 mb-3 bg-[#003153] h-1' />
+                
+                {/* OTP Status Indicator */}
+                {!otpSettings.otpEnabled && (
+                    <div className="mb-4 p-2 bg-blue-50 border border-blue-200 rounded-lg text-center">
+                        <p className="text-sm text-blue-700">
+                            OTP verification is currently disabled. You can register directly.
+                        </p>
+                    </div>
+                )}
 
-                <div className="w-full space-y-3">
-                    {/* Row 1: Username only */}
+                <div className="w-full">
+
                     <div className="relative flex flex-col w-full">
                         <input
                             type="text"
-                            className={`p-2 pl-3 pr-8 outline-none border-b-2 border-gray-400 rounded-xs ${usernameError ? 'border-red-400' : ''}`}
+                            className={`p-2 pl-3 pr-8 outline-none border-b-2 border-gray-400 rounded-xs  ${usernameError ? 'border-red-400' : 'mb-2'}`}
                             placeholder="Enter your Username"
                             value={form.username}
+                            onKeyDown={(e) => {
+                                if (e.key === ' ') {
+                                    e.preventDefault();
+                                }
+                            }}
+
                             onChange={(e) => {
                                 setForm({ ...form, username: e.target.value })
                                 if (usernameError) {
@@ -298,14 +338,19 @@ const Signup = () => {
                         )}
                     </div>
 
-                    {/* Row 2: Email and Phone number */}
                     <div className="flex space-x-3">
                         <div className="relative flex flex-col flex-1">
                             <input
                                 type='email'
-                                className={`p-2 pl-3 pr-8 outline-none border-b-2 border-gray-400 rounded-xs ${emailError ? 'border-red-400' : ''}`}
+                                className={`p-2 pl-3 pr-8 outline-none border-b-2 border-gray-400 rounded-xs ${emailError ? 'border-red-400' : 'mb-2'}`}
                                 placeholder='Enter your email'
                                 value={form.email}
+                                onKeyDown={(e) => {
+                                    if (e.key === ' ') {
+                                        e.preventDefault();
+                                    }
+                                }}
+
                                 onChange={(e) => {
                                     setForm({ ...form, email: e.target.value })
                                     if (emailError) {
@@ -318,13 +363,14 @@ const Signup = () => {
                                 <p className="text-red-500 text-xs mt-1">{emailErrorMsg}</p>
                             )}
                         </div>
-
-                        <div className="relative flex space-x-2 flex-1">
+                    </div>
+                    <div className="flex space-x-3">
+                        <div className="relative flex space-x-2 flex-1 mb-2">
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button
                                         variant="ghost"
-                                        className={`w-16 h-full p-2 text-center border-b-2 border-gray-400 outline-none bg-white text-gray-500 rounded-xs flex justify-between items-center text-xs ${phoneError ? 'border-red-400' : ''}`}
+                                        className={`w-16 h-full p-2 text-center border-b-2 border-gray-400 outline-none bg-white text-gray-500 rounded-xs flex justify-between items-center text-xs ${phoneError ? '' : ''}`}
                                     >
                                         {countryCode}
                                         <ChevronDownIcon className="h-3 w-3" />
@@ -353,6 +399,12 @@ const Signup = () => {
                                     className={`w-full p-2 pl-3 pr-8 outline-none border-b-2 border-gray-400 ${phoneError ? 'border-red-400' : ''}`}
                                     maxLength={10}
                                     value={form.phone}
+                                    onKeyDown={(e) => {
+                                        if (e.key === ' ') {
+                                            e.preventDefault();
+                                        }
+                                    }}
+
                                     onChange={(e) => {
                                         // Only allow numbers
                                         const value = e.target.value.replace(/\D/g, '');
@@ -363,15 +415,16 @@ const Signup = () => {
                                         }
                                     }}
                                 />
-                                {phoneError && (
-                                    <p className="text-red-500 text-xs mt-1">{phoneErrorMsg}</p>
-                                )}
+
                             </div>
+
                         </div>
 
                     </div>
+                    {phoneError && (
+                        <p className="text-red-500 text-xs mt-1">{phoneErrorMsg}</p>
+                    )}
 
-                    {/* Row 3: Date of Birth and Gender */}
                     <div className="flex space-x-3">
                         <div className='relative flex flex-col flex-1'>
                             <Popover open={open} onOpenChange={setOpen}>
@@ -379,7 +432,7 @@ const Signup = () => {
                                     <Button
                                         variant="ghost"
                                         id="date"
-                                        className={`outline-none text-sm font-normal border-0 border-b-2 border-gray-400 bg-#fff text-gray-500 rounded-xs text-left w-full flex justify-between items-center pr-8 p-2 ${dobError ? 'border-red-400' : ''}`}
+                                        className={`outline-none text-sm font-normal border-0 border-b-2 border-gray-400 bg-#fff text-gray-500 rounded-xs text-left w-full flex justify-between items-center pr-8 p-2 ${dobError ? 'border-red-400' : 'mb-2'}`}
                                     >
                                         {date ? date.toLocaleDateString() : "Select Date of Birth"}
                                         <ChevronDownIcon className="h-4 w-4" />
@@ -389,6 +442,7 @@ const Signup = () => {
                                     <Calendar
                                         mode="single"
                                         selected={date}
+                                        defaultMonth={date || undefined}
                                         captionLayout="dropdown"
                                         onSelect={(date) => {
                                             setDate(date)
@@ -403,13 +457,22 @@ const Signup = () => {
                                 </PopoverContent>
                             </Popover>
                         </div>
+                    </div>
+                    {(dobError) && (
+                        <div className="flex space-x-3">
+                            <div className="flex-1">
+                                {dobError && <p className="text-red-500 text-xs mt-1">{dobErrorMsg}</p>}
+                            </div>
+                        </div>
+                    )}
+                    <div className="flex space-x-3">
 
                         <div className='relative flex flex-col flex-1'>
                             <DropdownMenu >
                                 <DropdownMenuTrigger asChild>
                                     <Button
                                         variant="outline"
-                                        className={`outline-none text-sm font-normal border-0 border-b-2 border-gray-400 bg-#fff text-gray-500 rounded-xs text-left w-full flex justify-between items-center pr-8 p-2 ${genderError ? 'border-red-400' : ''}`}
+                                        className={`outline-none text-sm font-normal border-0 border-b-2 border-gray-400 bg-#fff text-gray-500 rounded-xs text-left w-full flex justify-between items-center pr-8 p-2 ${genderError ? 'border-red-400' : 'mb-2'}`}
                                     >
                                         {gender}  <ChevronDownIcon className="h-4 w-4" />
                                     </Button>
@@ -432,11 +495,8 @@ const Signup = () => {
                             </DropdownMenu>
                         </div>
                     </div>
-                    {(dobError || genderError) && (
+                    {(genderError) && (
                         <div className="flex space-x-3">
-                            <div className="flex-1">
-                                {dobError && <p className="text-red-500 text-xs mt-1">{dobErrorMsg}</p>}
-                            </div>
                             <div className="flex-1">
                                 {genderError && <p className="text-red-500 text-xs mt-1">{genderErrorMsg}</p>}
                             </div>
@@ -448,9 +508,15 @@ const Signup = () => {
                         <div className="relative">
                             <input
                                 type={showPassword ? 'text' : 'password'}
-                                className={`w-full not-last:not-only:p-2 pl-3 pr-12 outline-none border-b-2 border-gray-400 rounded-xs ${passwordError ? 'border-red-400' : ''}`}
+                                className={`w-full not-last:not-only:p-2 pl-3 pr-12 outline-none border-b-2 border-gray-400 rounded-xs ${passwordError ? 'border-red-400' : 'mb-2'}`}
                                 placeholder='Enter your Password'
                                 value={form.password}
+                                onKeyDown={(e) => {
+                                    if (e.key === ' ') {
+                                        e.preventDefault();
+                                    }
+                                }}
+
                                 maxLength={16}
                                 onChange={(e) => {
                                     setForm({ ...form, password: e.target.value })
@@ -502,9 +568,15 @@ const Signup = () => {
                             <input
                                 type={showConfirmPassword ? 'text' : 'password'}
                                 maxLength={16}
-                                className={`w-full p-2 pl-3 pr-12 outline-none border-b-2 border-gray-400 rounded-xs ${confirmPasswordError ? 'border-red-400' : ''}`}
+                                className={`w-full p-2 pl-3 pr-12 outline-none border-b-2 border-gray-400 rounded-xs ${confirmPasswordError ? 'border-red-400' : 'mb-2'}`}
                                 placeholder='Confirm Password'
                                 value={form.confirmPassword}
+                                onKeyDown={(e) => {
+                                    if (e.key === ' ') {
+                                        e.preventDefault();
+                                    }
+                                }}
+
                                 onChange={(e) => {
                                     setForm({ ...form, confirmPassword: e.target.value })
                                     if (confirmPasswordError) {
@@ -552,7 +624,7 @@ const Signup = () => {
                         <input
                             type="text"
                             maxLength={6}
-                            className={`p-2 pl-3 pr-8 outline-none border-b-2 rounded-xs text-left tracking-widest text-lg ${otpError ? 'border-red-400' : 'border-gray-400'
+                            className={`p-2 pl-3 pr-8 outline-none border-b-2 rounded-xs text-left tracking-widest text-lg ${otpError ? 'border-red-400' : 'border-gray-400 mb-2'
                                 }`}
                             placeholder="Enter 6-digit OTP"
                             value={otp}
